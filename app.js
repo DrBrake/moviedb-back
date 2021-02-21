@@ -4,6 +4,15 @@ const mongoose = require('mongoose');
 const dayjs = require('dayjs');
 const schemas = require('./schema');
 const sharp = require('sharp');
+const last = require('lodash/last');
+const fs = require('fs');
+
+require('@tensorflow/tfjs-node');
+const canvas = require('canvas');
+const faceapi = require('face-api.js');
+
+const { Canvas, Image, ImageData } = canvas;
+faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 const app = express();
 
@@ -28,6 +37,8 @@ db.on('error', console.error.bind(console, 'Connection error:'));
 db.once('open', () => {
   console.log("Database connection established successfully");
 });
+
+faceapi.nets.ssdMobilenetv1.loadFromDisk(`${dir}/models`);
 
 app.get('/', async (req, res) => {
   const movieQuery = movieModel.find().exec();
@@ -136,28 +147,65 @@ app.get('/images/:type/:image', async (req, res) => {
   const onlyBack = req.query.back;
   const onlyFront = req.query.front;
   const onlySpine = req.query.spine;
+  const onlyFace = req.params.type === "faces";
 
-  const makeImage = (inputFile) => {
-    if (onlyBack || onlyFront) { 
-      return sharp(inputFile)
+  const faceDetection = async (inputFile) => {
+      const imageName = last(inputFile.split("/"));
+      const actorFile = inputFile.replace("faces", "actor");
+      const img = await canvas.loadImage(actorFile);
+      const detection = await faceapi.detectSingleFace(img);
+      if (detection) {
+        const widthOffset = detection.imageWidth / 10;
+        const heightOffset = detection.imageHeight / 10;
+        const valueOrZero = (value) => {
+          if (value < 0) return 0;
+          return value;
+        }
+        return sharp(actorFile)
         .jpeg({ quality: 100 })
+        .extract({
+          width: parseInt(detection.box.width + widthOffset),
+          height: parseInt(detection.box.height + heightOffset),
+          left: valueOrZero(parseInt(detection.box.x - (widthOffset / 2))),
+          top: valueOrZero(parseInt(detection.box.y - (heightOffset / 2))),
+        })
+        .resize(40, 40)
+        .toFile(`${dir}/images/faces/${imageName}`);
+      }
+      return Promise.reject();
+  }
+
+  const makeImage = async (inputFile) => {
+    if (onlyBack || onlyFront) {
+      return sharp(inputFile)
+        .webp({ quality: 100 })
         .resize(400, 568, { position: onlyBack ? "left top" : "right top" })
         .toBuffer();
     } else if (onlySpine) {
       return sharp(inputFile)
-        .jpeg({ quality: 100 })
+        .webp({ quality: 100 })
         .resize(41, 568)
         .toBuffer();
+    } else if (onlyFace) {
+      try {
+        if (!fs.existsSync(inputFile)) await faceDetection(inputFile);
+        return sharp(inputFile)
+          .webp({ quality: 80 })
+          .toBuffer();
+      } catch (err) {
+        console.log(err);
+        return null;
+      }
     }
     return sharp(inputFile)
-      .jpeg({ quality: 100 })
+      .webp({ quality: 100 })
       .resize(widthIsNumber ? width : null, heightIsNumber ? height : null)
       .toBuffer();
   };
 
   const sendData = (data, status) => {
     res.writeHead(status, {
-      'Content-Type': 'image/jpeg',
+      'Content-Type': 'image/webp',
       'Content-Length': data.length,
       'Cache-Control': 'public, max-age=86400'
     });
@@ -167,6 +215,7 @@ app.get('/images/:type/:image', async (req, res) => {
   try {
     const data = await makeImage(`${dir}/images/${req.params.type}/${req.params.image}`);
     if (data) sendData(data, 200);
+    else res.status(500).send();
   } catch(error) {
     try {
       if (req.params.type === "movie") {

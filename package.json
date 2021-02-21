@@ -7,8 +7,13 @@
     "dev-server": "nodemon app.js"
   },
   "dependencies": {
+    "@tensorflow/tfjs-core": "^1.7.0",
+    "@tensorflow/tfjs-node": "^1.7.0",
+    "canvas": "^2.6.1",
     "dayjs": "^1.8.29",
     "express": "^4.17.1",
+    "face-api.js": "^0.22.2",
+    "lodash": "^4.17.21",
     "mongodb": "^3.4.0",
     "mongoose": "^5.8.1",
     "sharp": "^0.26.1"
