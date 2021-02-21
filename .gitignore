@@ -1,0 +1,8 @@
+node_modules/
+public/images
+actors.json
+genres.json
+movies.json
+dump/
+db/
+.DS_Store
