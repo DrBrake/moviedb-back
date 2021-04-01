@@ -1,8 +1,11 @@
 node_modules/
-public/images
+public/images/actor/*
+public/images/movie/*
+public/images/thumbnail/*
+public/images/faces/*
 actors.json
 genres.json
 movies.json
 dump/
-db/
+db/*
 .DS_Store

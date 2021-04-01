@@ -6,7 +6,6 @@ exports.movieSchema = new Schema({
   _id: ObjectId,
   MovieID: Number,
   MovieName: String,
-  MovieCode: String,
   MovieYear: Number,
   MovieAdded: String,
   MovieLocation: Array,
